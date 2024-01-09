@@ -62,11 +62,13 @@ INSTALLED_APPS = [
     'base.apps.BaseConfig',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -96,6 +98,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'ververesume.wsgi.application'
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+# cors setting
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

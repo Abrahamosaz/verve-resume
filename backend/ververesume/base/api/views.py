@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.reverse import reverse
 from .serializers import (LoginUserSerializer, SignUserSerializer,
                           TokenSerializer, UserForgotPassword, ResetPasswordSerializer)
 from django.contrib.auth import authenticate
@@ -68,7 +69,6 @@ def confirm_email(request):
     decoded_token = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
     try:
         user = User.objects.get(id=decoded_token.get("id"))
-
         if not user:
             raise User.DoesNotExist()
         user.emailConfirmed = True
@@ -80,20 +80,26 @@ def confirm_email(request):
 
 @api_view(["POST"])
 def resendConfirm_email(request):
-    token = request.data.get("token")
-    decoded_token = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+    email = request.data.get("email")
     try:
-        user = User.objects.get(id=decoded_token.get("id"))
+        user = User.objects.get(Q(email__exact=email))
         if not user:
             raise User.DoesnotExist()
-        if not user.emailConfirmed:
-            user.emailConfirmed = True
-            user.save()
-            return Response({"message": "Email confirmed"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"message": "Email already confirmed"}, status=status.HTTP_200_OK)
+        token = create_jwt_token(user)
+        engine = Engine.get_default()
+        template = engine.get_template("confirmEmail.html")
+        context = Context({ "user": user,
+                            "confirmEmailUrl": "http://localhost:8000/api/confirmEmail/{}".format(token)})
+        template_str = template.render(context)
+        send_mail("confirmEmail", "confirmEmail message", os.getenv("SENDER_MAIL"),
+                    [user.email], html_message=template_str)
+        return Response({"message": "email sent"}, status=status.HTTP_200_OK)
+    except Exception as err:
+        print("error", err.args)
     except User.DoesNotExist:
         return Response({"error": "user with id does not exist"}, status=status.HTTP_404_NOT_FOUND)
+  
+
 
     
 
@@ -175,6 +181,7 @@ class LoginView(APIView):
         """login a user and generate token"""
         email = request.data.get("email", None)
         password = request.data.get("password", None)
+        user = None
 
         serializer = LoginUserSerializer(data=request.data)
         if serializer.is_valid():   
@@ -190,12 +197,14 @@ class LoginView(APIView):
             
             refresh = None
             if serializer.validated_data.get("rememberMe"):
-                    refresh = create_access_refresh_jwt_token(user, life_time=timedelta(days=90))
+                    refresh = create_access_refresh_jwt_token(user, life_time=timedelta(days=10))
             else:
                 refresh = create_access_refresh_jwt_token(user)
             token = {"refresh": str(refresh),
                      "access": str(refresh.access_token)}
-            return Response({"message": "Login successfull", "token": token},
+            user_res = {"id": user.id, "email": user.email,"emailConfirmed": user.emailConfirmed,
+                        "isAdmin": user.is_admin}
+            return Response({"user": user_res, "token": token},
                             status=status.HTTP_200_OK)
         else:
             print("error", serializer.errors)

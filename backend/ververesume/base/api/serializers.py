@@ -22,6 +22,7 @@ class LoginUserSerializer(serializers.Serializer):
 
 
 
+
 class UserForgotPassword(serializers.Serializer):
     email = serializers.EmailField()
 
